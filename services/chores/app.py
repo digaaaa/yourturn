@@ -1,11 +1,12 @@
 import json
 import os
 from datetime import date
+from time import perf_counter
 from urllib.error import URLError
 from urllib.request import urlopen
 
 import pymssql
-from flask import Flask, jsonify, request
+from flask import Flask, g, jsonify, request
 
 from .database import connect
 from .migrate import run_migrations
@@ -13,6 +14,24 @@ from .repository import ChoreRepository
 from .service import ChoreService
 
 app = Flask(__name__)
+
+
+@app.before_request
+def start_request_timer():
+    g.started_at = perf_counter()
+
+
+@app.after_request
+def finish_request(response):
+    origin = request.headers.get("Origin")
+    response.vary.add("Origin")
+    if origin and origin == os.environ.get("UI_ORIGIN"):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    duration_ms = (perf_counter() - g.started_at) * 1000
+    print(f"{request.method} {request.path} {response.status_code} {duration_ms:.1f}ms", flush=True)
+    return response
 
 @app.get("/")
 def home():

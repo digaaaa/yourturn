@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YourTurn</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="config.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>YourTurn</h1>
+    <nav aria-label="Household">
+      <a href="#chores">Chores</a>
+      <a href="#supplies">Shared supplies</a>
+    </nav>
+  </header>
+  <main>
+    <section id="chores">
+      <h2>Chores</h2>
+      <p class="message" role="status"></p>
+      <div class="records"></div>
+      <h3>Chores done this month</h3>
+      <div class="totals"></div>
+      <details><summary>Supply spending this month</summary><div id="household-spending"></div></details>
+    </section>
+    <section id="supplies" hidden>
+      <h2>Shared supplies</h2>
+      <p class="message" role="status"></p>
+      <div class="records"></div>
+      <h3>Spent this month</h3>
+      <div class="totals"></div>
+    </section>
+  </main>
+</body>
+</html>
