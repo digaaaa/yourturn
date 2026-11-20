@@ -1,5 +1,8 @@
+import json
 import os
 from datetime import date
+from urllib.error import URLError
+from urllib.request import urlopen
 
 import pymssql
 from flask import Flask, jsonify, request
@@ -33,9 +36,14 @@ def health():
 
 
 def get_roommates():
-    # Use the original seed roster until the Chores API is wired in.
-    return [{"id": index, "name": name}
-            for index, name in enumerate(("Alex", "Sam", "Jordan", "Maya"), start=1)]
+    base_url = os.environ.get("CHORES_SERVICE_URL")
+    if not base_url:
+        return []
+    try:
+        with urlopen(base_url.rstrip("/") + "/roommates", timeout=2) as response:
+            return json.load(response)
+    except (URLError, OSError, ValueError):
+        return []
 
 
 @app.get("/supplies/")
@@ -44,7 +52,15 @@ def supplies_page():
     with connect() as conn:
         service = SupplyService(SupplyRepository(conn, roommates))
         return jsonify(supplies=service.overview(), roommates=roommates,
-                       spending=service.monthly_spending(date.today()))
+                       spending=service.monthly_spending(date.today()),
+                       warning=None if roommates else "Roommate information is temporarily unavailable.")
+
+
+@app.get("/supplies/spending")
+def spending():
+    with connect() as conn:
+        repository = SupplyRepository(conn, [])
+        return jsonify(repository.spent_since(date.today().replace(day=1).isoformat()))
 
 
 @app.post("/supplies/<int:supply_id>/bought")
@@ -63,6 +79,8 @@ def mark_bought(supply_id):
     except (TypeError, ValueError, OverflowError):
         return jsonify(error="Enter a valid price."), 400
     roommates = get_roommates()
+    if not roommates:
+        return jsonify(error="Roommate information is unavailable. Try again shortly."), 503
     with connect() as conn:
         try:
             service = SupplyService(SupplyRepository(conn, roommates))

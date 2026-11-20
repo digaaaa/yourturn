@@ -55,6 +55,7 @@ services:
     ports:
       - "8002:8000"
     environment:
+      CHORES_SERVICE_URL: "http://chores:8000"
       DATABASE_URL: "mssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/yourturn_supplies"
     depends_on:
       db-init:
