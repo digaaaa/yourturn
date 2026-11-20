@@ -1,0 +1,64 @@
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "bash -c 'echo > /dev/tcp/localhost/1433'"
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  db-init:
+    image: mcr.microsoft.com/mssql-tools:latest
+    volumes:
+      - ./db/init.sql:/init.sql:ro
+    environment:
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        /opt/mssql-tools/bin/sqlcmd \
+          -S sqlserver \
+          -U sa \
+          -P "$$MSSQL_SA_PASSWORD" \
+          -C \
+          -i /init.sql \
+          -b
+
+  chores:
+    build: ./services/chores
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: "mssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/yourturn_chores"
+      SUPPLIES_SERVICE_URL: "http://supplies:8000"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  supplies:
+    build: ./services/supplies
+    ports:
+      - "8002:8000"
+    environment:
+      DATABASE_URL: "mssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/yourturn_supplies"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+volumes:
+  sqlserver_data:
