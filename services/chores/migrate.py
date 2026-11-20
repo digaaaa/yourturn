@@ -3,7 +3,7 @@
 
 from pathlib import Path
 
-from database import connect
+from .database import connect
 
 
 def run_migrations():
