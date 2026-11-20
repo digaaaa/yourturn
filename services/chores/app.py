@@ -1,5 +1,8 @@
+import json
 import os
 from datetime import date
+from urllib.error import URLError
+from urllib.request import urlopen
 
 import pymssql
 from flask import Flask, jsonify, request
@@ -45,6 +48,22 @@ def chores_page():
 def roommates():
     with connect() as conn:
         return jsonify(ChoreRepository(conn).list_roommates())
+
+
+@app.get("/chores/household-summary")
+def household_summary():
+    with connect() as conn:
+        roster = ChoreRepository(conn).list_roommates()
+    base_url = os.environ.get("SUPPLIES_SERVICE_URL")
+    if base_url:
+        try:
+            with urlopen(base_url.rstrip("/") + "/supplies/spending", timeout=2) as response:
+                totals = {row["roommate_id"]: row["spent"] for row in json.load(response)}
+            return jsonify(spending=[{"name": person["name"], "spent": round(totals.get(person["id"], 0), 2)}
+                                     for person in roster])
+        except (URLError, OSError, ValueError):
+            pass
+    return jsonify(error="Supply spending is temporarily unavailable."), 503
 
 
 @app.post("/chores/<int:chore_id>/done")

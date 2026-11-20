@@ -44,12 +44,12 @@ class SupplyService:
         for supply in self.repo.list_supplies():
             purchases = self.repo.purchases(supply["id"])
             last = purchases[-1] if purchases else None
-            next_id = self.next_person(supply["id"])
+            next_id = self.next_person(supply["id"]) if names else None
             summaries.append({
                 "id": supply["id"],
                 "name": supply["name"],
                 "next_person_id": next_id,
-                "next_person": names[next_id],
+                "next_person": names.get(next_id),
                 "last_bought": last["bought_on"] if last else None,
                 "last_price": last["price"] if last else None,
             })
