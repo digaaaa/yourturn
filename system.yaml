@@ -1,8 +1,7 @@
 # yaml-language-server: $schema=./system.schema.json
 student: knehad.ieu2024
 prefix: knehad-ieu2024
-# Set the verified Azure Storage static website endpoint after initial setup.
-public_url: null
+public_url: https://knehadieu2024ui.z43.web.core.windows.net/
 ui:
   path: ui
   storage_account: knehadieu2024ui
