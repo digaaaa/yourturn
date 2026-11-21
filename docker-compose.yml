@@ -7,7 +7,7 @@ services:
       MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
       MSSQL_PID: "Developer"
     ports:
-      - "1433:1433"
+      - "${SQLSERVER_PORT:-1433}:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
     healthcheck:
@@ -25,16 +25,24 @@ services:
       - ./db/init.sql:/init.sql:ro
     environment:
       MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+      CHORES_DB_PASSWORD: "${CHORES_DB_PASSWORD:?Set CHORES_DB_PASSWORD in the local environment}"
+      SUPPLIES_DB_PASSWORD: "${SUPPLIES_DB_PASSWORD:?Set SUPPLIES_DB_PASSWORD in the local environment}"
     depends_on:
       sqlserver:
         condition: service_healthy
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
-        /opt/mssql-tools/bin/sqlcmd \
+        for password in "$$CHORES_DB_PASSWORD" "$$SUPPLIES_DB_PASSWORD"; do
+          if [[ ! "$$password" =~ ^[A-Za-z0-9_]{16,64}$$ ]]; then
+            echo 'Service database passwords must be 16–64 letters, numbers or underscores.' >&2
+            exit 1
+          fi
+        done
+        export SQLCMDPASSWORD="$$MSSQL_SA_PASSWORD"
+        exec /opt/mssql-tools/bin/sqlcmd \
           -S sqlserver \
           -U sa \
-          -P "$$MSSQL_SA_PASSWORD" \
           -C \
           -i /init.sql \
           -b
@@ -42,9 +50,10 @@ services:
   chores:
     build: ./services/chores
     ports:
-      - "8001:8000"
+      - "${CHORES_PORT:-8001}:8000"
     environment:
-      DATABASE_URL: "mssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/yourturn_chores"
+      DATABASE_URL: "mssql://yourturn_chores_app:${CHORES_DB_PASSWORD}@sqlserver:1433/yourturn_chores"
+      UI_ORIGIN: "${UI_ORIGIN:-http://localhost:8080}"
       SUPPLIES_SERVICE_URL: "http://supplies:8000"
     depends_on:
       db-init:
@@ -53,12 +62,21 @@ services:
   supplies:
     build: ./services/supplies
     ports:
-      - "8002:8000"
+      - "${SUPPLIES_PORT:-8002}:8000"
     environment:
-      DATABASE_URL: "mssql://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/yourturn_supplies"
+      CHORES_SERVICE_URL: "http://chores:8000"
+      DATABASE_URL: "mssql://yourturn_supplies_app:${SUPPLIES_DB_PASSWORD}@sqlserver:1433/yourturn_supplies"
+      UI_ORIGIN: "${UI_ORIGIN:-http://localhost:8080}"
     depends_on:
       db-init:
         condition: service_completed_successfully
+
+  ui:
+    image: nginx:alpine
+    ports:
+      - "${UI_PORT:-8080}:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
 
 volumes:
   sqlserver_data:

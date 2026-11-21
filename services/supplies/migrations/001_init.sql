@@ -2,7 +2,7 @@
 CREATE TABLE supplies (
     id INT IDENTITY(1,1) PRIMARY KEY,
     name NVARCHAR(200) NOT NULL,
-    rule NVARCHAR(100) NOT NULL
+    [rule] NVARCHAR(100) NOT NULL
 );
 
 CREATE TABLE purchases (

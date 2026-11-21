@@ -1,0 +1,12 @@
+body { background: #f8faf9; color: #182b26; font: 1rem system-ui, sans-serif; margin: 0; }
+header, main { margin: auto; max-width: 72rem; padding: 1rem 1.5rem; }
+nav { display: flex; gap: 1.25rem; }
+a { color: #136655; }
+.records, .totals { overflow-x: auto; }
+table { border-collapse: collapse; min-width: 100%; background: white; }
+td, th { padding: .65rem; border-bottom: 1px solid #dce6e1; text-align: left; }
+form { display: flex; flex-wrap: wrap; gap: .4rem; }
+input { width: 5rem; }
+button, input, select { font: inherit; }
+.message { color: #874715; }
+details { margin: 1rem 0; }

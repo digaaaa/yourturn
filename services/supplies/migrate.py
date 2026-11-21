@@ -2,14 +2,27 @@
 """Apply versioned SQL Server migrations safely."""
 
 from pathlib import Path
+from time import sleep
 
-from database import connect
+from pymssql import OperationalError
+
+from .database import connect
+
+
+def connect_at_startup():
+    for delay in (1, 2, 4, 5, 5, 5, 5, 5):
+        try:
+            return connect()
+        except OperationalError:
+            print(f"Database connection unavailable; retrying in {delay}s", flush=True)
+            sleep(delay)
+    return connect()
 
 
 def run_migrations():
     migrations_dir = Path(__file__).parent / "migrations"
 
-    conn = connect()
+    conn = connect_at_startup()
     try:
         cursor = conn.cursor()
 
