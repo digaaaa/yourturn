@@ -1,18 +1,6 @@
 const config = window.yourTurnConfig;
 const euro = new Intl.NumberFormat("en", { style: "currency", currency: "EUR" });
 
-async function api(base, path, options) {
-  const response = await fetch(base + path, {
-    signal: AbortSignal.timeout(6000),
-    ...options,
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || "Service unavailable. Try again shortly.");
-  }
-  return response.status === 204 ? null : response.json();
-}
-
 function table(target, headings, rows) {
   const element = document.createElement("table");
   const heading = element.createTHead().insertRow();
@@ -79,9 +67,11 @@ async function load(domain) {
   const message = section.querySelector(".message");
   const records = section.querySelector(".records");
   const totals = section.querySelector(".totals");
-  message.textContent = "Loading…";
+  message.textContent = "Loading… The service may take a moment to start.";
   try {
-    const data = await api(config[domain], `/${domain}/`);
+    const data = await api(config[domain], `/${domain}/`, {
+      onRetry: () => { message.textContent = "Waiting for the service to start…"; },
+    });
     if (domain === "chores") {
       table(records, ["Chore", "Schedule", "Last done", "Status", "Next up", "Log it"],
         data.chores.map((row) => [row.name, `Every ${row.frequency_days} day(s)`,
@@ -115,7 +105,9 @@ spending.parentElement.addEventListener("toggle", async () => {
   if (!spending.parentElement.open) return;
   spending.textContent = "Loading…";
   try {
-    const data = await api(config.chores, "/chores/household-summary");
+    const data = await api(config.chores, "/chores/household-summary", {
+      onRetry: () => { spending.textContent = "Waiting for the service to start…"; },
+    });
     table(spending, ["Roommate", "Total"], data.spending.map((row) => [row.name, euro.format(row.spent)]));
   } catch (error) {
     spending.textContent = error.message;
