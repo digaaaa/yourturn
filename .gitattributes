@@ -1,0 +1,2 @@
+# Preserve the professor-provided schema exactly on every platform.
+/system.schema.json -text
