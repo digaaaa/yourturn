@@ -27,11 +27,12 @@ storage="${AZURE_PREFIX//-/}ui"
 
 az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 selected=$(az account show --query '[id,name,state]' --output json)
-python3 - "$AZURE_SUBSCRIPTION_ID" "$selected" <<'PY'
+SELECTED_SUBSCRIPTION_JSON="$selected" python3 - "$AZURE_SUBSCRIPTION_ID" <<'PY'
 import json
+import os
 import sys
 
-subscription, name, state = json.loads(sys.argv[2])
+subscription, name, state = json.loads(os.environ["SELECTED_SUBSCRIPTION_JSON"])
 if subscription != sys.argv[1] or name != "Azure for Students" or state != "Enabled":
     raise SystemExit("Expected the approved, enabled personal Azure for Students subscription.")
 print(f"Verified subscription: {name} ({subscription})")
@@ -59,10 +60,25 @@ for service in chores supplies; do
 done
 if (( ${#database_names[@]} )); then
     root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-    names_json=$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1:]))' "${database_names[@]}")
+    parameters=$(mktemp)
+    trap 'rm -f -- "$parameters"' EXIT
+    python3 - "$server" "$AZURE_SQL_REGION" "${database_names[@]}" > "$parameters" <<'PY'
+import json
+import sys
+
+server, location, *names = sys.argv[1:]
+print(json.dumps({"parameters": {key: {"value": value} for key, value in
+                                dict(server=server, location=location, databaseNames=names).items()}}))
+PY
+    if command -v cygpath >/dev/null; then
+        template_path=$(cygpath -m "$root/deployment/sql-free-preflight.json")
+        params_path=$(cygpath -m "$parameters")
+    else
+        template_path="$root/deployment/sql-free-preflight.json"
+        params_path="$parameters"
+    fi
     az deployment group validate --resource-group "$group" --validation-level Provider \
-        --template-file "$root/deployment/sql-free-preflight.json" \
-        --parameters "server=$server" "location=$AZURE_SQL_REGION" "databaseNames=$names_json" \
+        --template-file "$template_path" --parameters "@$params_path" \
         --output none
     printf '%s\n' 'Azure provider validation accepted the requested free-offer database configuration.'
 fi
@@ -80,11 +96,12 @@ for service in chores supplies; do
     fi
     actual=$(az sql db show --resource-group "$group" --server "$server" --name "$database" \
         --query '{free:useFreeLimit,whenFull:freeLimitExhaustionBehavior,tier:sku.tier,sku:sku.name,family:sku.family,max:sku.capacity,min:minCapacity,pause:autoPauseDelay,backup:requestedBackupStorageRedundancy,size:maxSizeBytes}' --output json)
-    python3 - "$database" "$actual" <<'PY'
+    ACTUAL_SQL_JSON="$actual" python3 - "$database" <<'PY'
 import json
+import os
 import sys
 
-name, actual = sys.argv[1], json.loads(sys.argv[2])
+name, actual = sys.argv[1], json.loads(os.environ["ACTUAL_SQL_JSON"])
 expected = dict(free=True, whenFull="AutoPause", tier="GeneralPurpose", family="Gen5",
                 sku="GP_S_Gen5", max=1, min=0.5, backup="Local", size=32 * 1024**3)
 if any(actual[key] != value for key, value in expected.items()):
