@@ -1,0 +1,63 @@
+# yaml-language-server: $schema=./system.schema.json
+student: knehad.ieu2024
+prefix: knehad-ieu2024
+# Set the verified Azure Storage static website endpoint after initial setup.
+public_url: null
+ui:
+  path: ui
+  storage_account: knehadieu2024ui
+  calls: [chores, supplies]
+azure:
+  resource_group: rg-knehad-ieu2024
+  container_apps_environment: knehad-ieu2024-env
+  sql_server: knehad-ieu2024-sql
+  registry: ghcr.io/digaaaa
+services:
+  chores:
+    description: Owns the roommate roster, chore schedules, completion history and turn rules.
+    path: services/chores
+    openapi: services/chores/openapi.yaml
+    port_default: 8000
+    health: /health
+    migrations: services/chores/migrations
+    env:
+      PORT: {default: 8000, description: TCP port on which the service listens}
+      DATABASE_URL: {secret: true, description: Connection URL for the Chores database only}
+      APP_VERSION: {default: local, description: Release Git SHA shown by health}
+      UI_ORIGIN: {default: "", description: The one browser origin allowed by CORS}
+      SUPPLIES_SERVICE_URL:
+        default: ""
+        description: Supplies API origin. Compose sets http://supplies:8000.
+    calls:
+      - service: supplies
+        url_env: SUPPLIES_SERVICE_URL
+        endpoints: ["GET /supplies/spending"]
+        timeout_s: 2
+        on_failure: Chores remains available. Its optional household spending summary returns HTTP 503.
+    azure:
+      container_app: knehad-ieu2024-chores
+      sql_database: knehad-ieu2024-chores-db
+  supplies:
+    description: Owns supply inventory, purchase history, turn rules and spending totals.
+    path: services/supplies
+    openapi: services/supplies/openapi.yaml
+    port_default: 8000
+    health: /health
+    migrations: services/supplies/migrations
+    env:
+      PORT: {default: 8000, description: TCP port on which the service listens}
+      DATABASE_URL: {secret: true, description: Connection URL for the Supplies database only}
+      APP_VERSION: {default: local, description: Release Git SHA shown by health}
+      UI_ORIGIN: {default: "", description: The one browser origin allowed by CORS}
+      CHORES_SERVICE_URL:
+        default: ""
+        description: Chores API origin. Compose sets http://chores:8000.
+    calls:
+      - service: chores
+        url_env: CHORES_SERVICE_URL
+        endpoints: ["GET /roommates"]
+        timeout_s: 2
+        on_failure: Inventory remains available with a warning. Recording a purchase returns HTTP 503.
+    azure:
+      container_app: knehad-ieu2024-supplies
+      sql_database: knehad-ieu2024-supplies-db
