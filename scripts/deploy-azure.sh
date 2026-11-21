@@ -28,6 +28,8 @@ update_app() {
     local domain=$1 database_url=$2 peer_setting=$3
     az containerapp secret set --name "$AZURE_PREFIX-$domain" --resource-group "$group" \
         --secrets "database-url=$database_url" --output none
+    az containerapp ingress update --name "$AZURE_PREFIX-$domain" --resource-group "$group" \
+        --target-port 8000 --allow-insecure false --output none
     az containerapp update --name "$AZURE_PREFIX-$domain" --resource-group "$group" \
         --image "$registry-$domain:$GITHUB_SHA" --min-replicas 0 --max-replicas 1 \
         --set-env-vars "DATABASE_URL=secretref:database-url" "APP_VERSION=$GITHUB_SHA" \
