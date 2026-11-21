@@ -48,7 +48,10 @@ services:
           -b
 
   chores:
-    build: ./services/chores
+    build:
+      context: ./services/chores
+      args:
+        APP_VERSION: "${APP_VERSION:-local}"
     ports:
       - "${CHORES_PORT:-8001}:8000"
     environment:
@@ -60,7 +63,10 @@ services:
         condition: service_completed_successfully
 
   supplies:
-    build: ./services/supplies
+    build:
+      context: ./services/supplies
+      args:
+        APP_VERSION: "${APP_VERSION:-local}"
     ports:
       - "${SUPPLIES_PORT:-8002}:8000"
     environment:

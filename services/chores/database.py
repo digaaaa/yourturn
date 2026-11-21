@@ -23,4 +23,6 @@ def connect():
         database=parsed.path.lstrip("/"),
         login_timeout=10,
         timeout=10,
+        encryption="require",
+        tds_version="7.4",
     )

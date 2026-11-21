@@ -23,7 +23,9 @@ def call(base, path, payload=None):
 def wait_for_health(base):
     for _ in range(60):
         try:
-            if call(base, "/health")["db"] == "ok":
+            health = call(base, "/health")
+            if health["db"] == "ok":
+                assert health["version"] == os.environ.get("APP_VERSION", "local"), health
                 return
         except (URLError, OSError):
             pass

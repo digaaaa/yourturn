@@ -32,6 +32,8 @@ jobs:
   compose:
     name: Docker builds and SQL Server integration
     runs-on: ubuntu-latest
+    env:
+      APP_VERSION: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

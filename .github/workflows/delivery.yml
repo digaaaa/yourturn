@@ -32,6 +32,7 @@ jobs:
           push: true
           provenance: false
           tags: ${{ steps.image.outputs.tag }}
+          build-args: APP_VERSION=${{ github.sha }}
 
   deploy:
     name: Deploy to Azure and verify live health
