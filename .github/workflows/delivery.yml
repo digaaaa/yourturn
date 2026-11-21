@@ -31,6 +31,7 @@ jobs:
           context: services/${{ matrix.service }}
           push: true
           tags: ${{ steps.image.outputs.tag }}
+          build-args: APP_VERSION=${{ github.sha }}
 
   deploy:
     name: Deploy to Azure and verify live health
