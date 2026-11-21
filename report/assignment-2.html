@@ -62,18 +62,18 @@ Chores   → GET /supplies/spending → Supplies</pre>
   <p>The database still enforces the internal foreign keys. Supplies validates the roommate against the current Chores roster before recording a purchase. Each local login was denied access to the other database.</p>
   <h3>Startup and legacy transfer</h3>
   <p>The one-off Compose initializer sets up two databases and logins. A service then applies numbered SQL files in order and commits each successful file with its filename. Historical SQLite records are read without changing the file. The importer matches catalogue rows, preserves log IDs, and aborts on conflicting IDs. Repeating the local import added zero records.</p>
-  <h3>Migration 003 · verified on isolated local SQL Server</h3>
+  <h3>Migration 003 · verified on Azure SQL</h3>
   <table>
     <thead><tr><th>Evidence</th><th>Before</th><th>After and restart</th></tr></thead>
     <tbody>
-      <tr><td>Chore rows</td><td>7</td><td>7</td></tr>
+      <tr><td>Chore rows</td><td>1</td><td>1 before the follow-up write</td></tr>
       <tr><td>First row ID</td><td>1</td><td>1</td></tr>
       <tr><td>Timestamp column</td><td>Absent</td><td><code>recorded_at_utc datetime2</code></td></tr>
       <tr><td>Migration history</td><td>001, 002</td><td>001, 002, 003 (once)</td></tr>
     </tbody>
   </table>
-  <p>The fingerprint of all original completion fields matched before and after: <code>705f761f2e35ad5b05197e5ebe34e8b1d4e0744519e2ffc28c7a33ee8c803bbd</code>. The new default records insertion time in UTC for new rows. Existing rows retain the original dates, with unknown insertion times left blank. The two imported purchases also remained available.</p>
-  <p class="note">Azure migration evidence is pending. The live exercise must begin on the baseline deployment, capture a populated snapshot, deploy migration 003, and compare the Azure snapshots and startup log.</p>
+  <p>The fingerprint of the original fields matched before and after: <code>b346481ae2c40667504ecc81002bfaa38e333e39fa9f65e01ad262f6e0263de0</code>. Row 1 retained its original date and a null insertion timestamp. The follow-up completion created row 2 with UTC timestamp <code>2026-11-21T18:29:20Z</code>. Azure logged the migration once at <code>18:27:49.796Z</code>.</p>
+  <p>See the <a href="https://github.com/digaaaa/yourturn/actions/runs/44935452608">successful migration deployment</a> and the <a href="evidence/azure-baseline.json">baseline</a> and <a href="evidence/azure-after-migration.json">after-migration</a> SQL evidence.</p>
   <footer>YourTurn · Databases and migrations · 2 / 5</footer>
 </section>
 <section>
@@ -87,8 +87,8 @@ Successful main run → GHCR chores:SHA and supplies:SHA
   <h3>Local Docker</h3>
   <p><code>docker compose up --build</code> starts SQL Server, the one-off database initializer, both apps, and stock nginx. The services run as non-root users. The database volume retains data across container restarts. The UI is at <code>http://localhost:8080</code>.</p>
   <h3>Verified GitHub delivery</h3>
-  <p>The <a href="https://github.com/digaaaa/yourturn/actions/runs/44911591975">main workflow run</a> passed the required checks and published both images tagged <code>b6ffce2d7aa65046dccf9ef7a36f0ff419824778</code>. The Azure job was skipped while the repository deployment gate was disabled.</p>
-  <h3>Prepared Azure layout</h3>
+  <p>The <a href="https://github.com/digaaaa/yourturn/actions/runs/44927793847/attempts/2">baseline deployment</a> published both exact-SHA images and deployed both APIs and the <a href="https://knehadieu2024ui.z43.web.core.windows.net/">Azure Storage website</a>. Both health responses included baseline SHA <code>ac335ccf3641b78405659a5986b6c8bbbae579cb</code> and database status <code>ok</code>.</p>
+  <h3>Verified Azure layout</h3>
   <table>
     <tbody>
       <tr><th>Resource group</th><td><code>rg-knehad-ieu2024</code></td></tr>
@@ -97,7 +97,7 @@ Successful main run → GHCR chores:SHA and supplies:SHA
       <tr><th>UI and deployment identity</th><td><code>knehadieu2024ui</code> and <code>knehad-ieu2024-github</code></td></tr>
     </tbody>
   </table>
-  <p>The provisioning script requests Consumption, 0–1 replicas, and two free-offer serverless databases with overage auto-pause. GitHub actions can assume a scoped identity from <code>main</code>. The deployment sets the expected Git SHA, applies the browser origin, publishes the static site, and verifies live health. The chosen subscription, region, and live resource settings are pending verification.</p>
+  <p>Spain Central hosts the Consumption apps (0–1 replicas), Storage, and Log Analytics. Poland Central hosts two Gen5 serverless SQL databases (0.5–1 vCore), both verified on the free offer with <code>AutoPause</code> at the monthly limit. OIDC signed in from <code>main</code>, and both professors have resource-group Reader access.</p>
   <footer>YourTurn · CI/CD and Azure design · 3 / 5</footer>
 </section>
 <section>
@@ -136,11 +136,11 @@ After restarting each peer, both cross-service requests recovered.</pre>
     <li><strong>One pipeline with an explicit gate.</strong> The code that passes CI is the code tagged in GHCR. Deployment uses the same SHA and waits for that exact version to respond.</li>
   </ul>
   <h3>Git and real evidence</h3>
-  <p>The local-stack PRs were merged into their stacked bases and later integrated into main through <a href="https://github.com/digaaaa/yourturn/pull/8">PR 8</a>. CI, the API contracts, and delivery were reviewed in separate PRs. The current evidence does not demonstrate a failed-then-fixed GitHub run. The strict system check is blocked on the live URL.</p>
+  <p>The local-stack PRs were integrated into <code>main</code> through <a href="https://github.com/digaaaa/yourturn/pull/8">PR 8</a>. The <a href="https://github.com/digaaaa/yourturn/actions/runs/44927793847/attempts/1">first Azure deployment attempt</a> failed when Chores tried to create a foreign key (SQL error 1088). I added <code>REFERENCES</code> to each login in its own database. The <a href="https://github.com/digaaaa/yourturn/actions/runs/44927793847/attempts/2">second attempt</a> deployed the same SHA successfully. The <a href="https://github.com/digaaaa/yourturn/pull/18">bootstrap fix</a> records the permission explicitly.</p>
   <h3>AI use disclosure</h3>
   <p>Codex assisted with implementation, CI and deployment scripts, automated tests, local verification, and this report. Results shown here came from test output, GitHub Actions, or direct local observations recorded during the work. <code>AI_USAGE.md</code> records the assistance and explanations for review before submission.</p>
   <h3>Live release status</h3>
-  <p class="note">Pending: verified Azure URLs, professor access, actual OIDC deployment, Azure before-and-after migration evidence, and final submission tag. This report describes the verified local system and published images. Planned Azure settings require verification on the actual subscription.</p>
+  <p class="note">Baseline and migration deployment, public endpoint checks, and Reader access are verified. The final submission tag follows the final approved merge and health verification. The Git history spans fewer than six distinct commit dates, and the five new ADRs were committed on one date.</p>
   <footer>YourTurn · Process and release status · 5 / 5</footer>
 </section>
 </body>

@@ -65,6 +65,8 @@ python scripts/migration_snapshot.py
 
 The snapshot command uses the Chores database URL. It prints schema, migration history, row count, and a fingerprint of the original fields without printing the underlying records.
 
+The [Azure baseline](report/evidence/azure-baseline.json) had one chore completion. The [after-migration evidence](report/evidence/azure-after-migration.json) shows the same row fingerprint and demonstrates that a new completion receives a UTC insertion timestamp. [GitHub Actions deployed migration 003](https://github.com/digaaaa/yourturn/actions/runs/44935452608).
+
 ### Run tests and checks
 
 In a Python 3.12 virtual environment:
@@ -86,7 +88,7 @@ With a disposable Compose stack, `python scripts/check_local.py` checks each API
 
 GitHub Actions runs lint, both service suites, the Assignment 1 suite, separate 70% core-logic coverage gates, API validation and Docker/SQL integration. Main builds publish SHA-tagged images to GHCR. With approved configuration, the same successful build logs in to Azure via OIDC, deploys both apps, waits for healthy responses on the same SHA and uploads the static UI to Storage. The one-time setup, secret names and resource permissions are in [deployment/README.md](deployment/README.md).
 
-The [main publishing run](https://github.com/digaaaa/yourturn/actions/runs/44911591975) succeeded for both images. Azure provisioning, deployment verification and public URLs are pending. See [the report](report/assignment-2.pdf) for architecture, database diagrams, and current evidence.
+The [baseline deployment](https://github.com/digaaaa/yourturn/actions/runs/44927793847/attempts/2) passed the official schema validation and deployed both SHA-tagged images. The live endpoints are [YourTurn](https://knehadieu2024ui.z43.web.core.windows.net/), [Chores health](https://knehad-ieu2024-chores.victoriousplant-cf8fe7c4.spaincentral.azurecontainerapps.io/health), and [Supplies health](https://knehad-ieu2024-supplies.victoriousplant-cf8fe7c4.spaincentral.azurecontainerapps.io/health). The apps and website are in Spain Central. Both free-offer SQL databases are in Poland Central. See [the report](report/assignment-2.pdf) for the architecture and verification evidence.
 
 ### Troubleshooting and limitations
 

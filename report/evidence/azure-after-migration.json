@@ -1,0 +1,127 @@
+{
+  "status": "verified",
+  "deployment_sha": "53822a86c08722eb7a598a363a9c4a0739e11327",
+  "baseline_sha": "ac335ccf3641b78405659a5986b6c8bbbae579cb",
+  "baseline_evidence_file_sha256": "f04f5bb53cbf071b74ed3a346766894323d3a75d59925ca3b27c7c67faa016e1",
+  "workflow_url": "https://github.com/digaaaa/yourturn/actions/runs/44935452608",
+  "resource_group": "rg-knehad-ieu2024",
+  "region": "polandcentral",
+  "database": "knehad-ieu2024-chores-db",
+  "after_migration": {
+    "table": "dbo.chore_log",
+    "columns": [
+      {
+        "name": "id",
+        "type": "int",
+        "nullable": "NO",
+        "default_value": null,
+        "datetime_precision": null,
+        "is_identity": 1
+      },
+      {
+        "name": "chore_id",
+        "type": "int",
+        "nullable": "NO",
+        "default_value": null,
+        "datetime_precision": null,
+        "is_identity": 0
+      },
+      {
+        "name": "roommate_id",
+        "type": "int",
+        "nullable": "NO",
+        "default_value": null,
+        "datetime_precision": null,
+        "is_identity": 0
+      },
+      {
+        "name": "done_on",
+        "type": "date",
+        "nullable": "NO",
+        "default_value": null,
+        "datetime_precision": 0,
+        "is_identity": 0
+      },
+      {
+        "name": "recorded_at_utc",
+        "type": "datetime2",
+        "nullable": "YES",
+        "default_value": "(sysutcdatetime())",
+        "datetime_precision": 0,
+        "is_identity": 0
+      }
+    ],
+    "keys": [
+      {
+        "type": "FOREIGN KEY",
+        "column_name": "chore_id",
+        "target_schema": "dbo",
+        "target_table": "chores",
+        "target_column": "id"
+      },
+      {
+        "type": "PRIMARY KEY",
+        "column_name": "id",
+        "target_schema": null,
+        "target_table": null,
+        "target_column": null
+      },
+      {
+        "type": "FOREIGN KEY",
+        "column_name": "roommate_id",
+        "target_schema": "dbo",
+        "target_table": "roommates",
+        "target_column": "id"
+      }
+    ],
+    "schema_migrations": [
+      {
+        "filename": "001_init.sql",
+        "applied_at_utc": "2026-11-21T17:17:29.6633776"
+      },
+      {
+        "filename": "002_seed.sql",
+        "applied_at_utc": "2026-11-21T17:17:29.9505214"
+      },
+      {
+        "filename": "003_record_completion_time.sql",
+        "applied_at_utc": "2026-11-21T18:27:49.7155815"
+      }
+    ],
+    "row_count": 1,
+    "original_fields_sha256": "b346481ae2c40667504ecc81002bfaa38e333e39fa9f65e01ad262f6e0263de0",
+    "row_fingerprints": [
+      {
+        "id": 1,
+        "sha256": "63c8613d9f7a2f467d48ce3015a68589fd7879d8bb350274b26c08c80afe98cb"
+      }
+    ]
+  },
+  "retained_demo_row": {
+    "id": 1,
+    "chore_id": 1,
+    "roommate_id": 1,
+    "done_on": "2026-11-21",
+    "recorded_at_utc": null
+  },
+  "follow_up_completion": {
+    "request_utc": "2026-11-21T18:29:18.9085337Z",
+    "http_status": 204,
+    "chore": "Dishes",
+    "roommate": "Sam",
+    "row": {
+      "id": 2,
+      "chore_id": 1,
+      "roommate_id": 2,
+      "done_on": "2026-11-21",
+      "recorded_at_utc": "2026-11-21T18:29:20"
+    }
+  },
+  "row_count_after_follow_up": 2,
+  "captured_at_utc": "2026-11-21T18:29:21.4451822Z",
+  "azure_migration_log": {
+    "filename": "003_record_completion_time.sql",
+    "occurrences": 1,
+    "time_generated_utc": "2026-11-21T18:27:49.796Z"
+  }
+}
