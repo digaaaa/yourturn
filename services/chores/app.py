@@ -1,5 +1,6 @@
 import json
 import os
+from contextlib import closing
 from datetime import date
 from time import perf_counter
 from urllib.error import URLError
@@ -44,11 +45,20 @@ def home():
 def health():
     version = os.environ.get("APP_VERSION", "local")
     try:
-        with connect() as conn:
+        with closing(connect()) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM dbo.schema_migrations")
-            cursor.fetchone()
-            cursor.execute("UPDATE dbo.schema_migrations SET applied_at = applied_at WHERE 1 = 0")
+            cursor.execute("SELECT applied_at FROM dbo.schema_migrations WHERE filename = '001_init.sql'")
+            current = cursor.fetchone()
+            if current is None:
+                return jsonify(status="unavailable", db="unavailable", version=version), 503
+            cursor.execute(
+                "UPDATE dbo.schema_migrations SET applied_at = DATEADD(second, 1, applied_at) "
+                "OUTPUT inserted.applied_at WHERE filename = '001_init.sql'"
+            )
+            changed = cursor.fetchone()
+            conn.rollback()
+            if changed is None or changed[0] <= current[0]:
+                return jsonify(status="unavailable", db="unavailable", version=version), 503
     except pymssql.Error:
         return jsonify(status="unavailable", db="unavailable", version=version), 503
     return jsonify(status="ok", db="ok", version=version)
@@ -80,7 +90,7 @@ def household_summary():
                 totals = {row["roommate_id"]: row["spent"] for row in json.load(response)}
             return jsonify(spending=[{"name": person["name"], "spent": round(totals.get(person["id"], 0), 2)}
                                      for person in roster])
-        except (URLError, OSError, ValueError):
+        except (URLError, OSError, ValueError, TypeError, KeyError):
             pass
     return jsonify(error="Supply spending is temporarily unavailable."), 503
 

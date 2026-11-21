@@ -2,7 +2,7 @@
 
 import unittest
 from contextlib import contextmanager
-from datetime import date
+from datetime import date, datetime, timedelta
 from threading import Thread
 from unittest.mock import MagicMock, Mock, patch
 
@@ -181,3 +181,27 @@ class ServiceBoundaryTests(unittest.TestCase):
                 response = module.app.test_client().get("/health")
                 self.assertEqual(response.status_code, 503)
                 self.assertEqual(response.json["db"], "unavailable")
+
+    def test_health_returns_version_and_rolls_back_a_database_write(self):
+        for module in (chores_api, supplies_api):
+            connection = MagicMock()
+            cursor = connection.cursor.return_value
+            timestamp = datetime(2026, 11, 20)
+            cursor.fetchone.side_effect = [(timestamp,), (timestamp + timedelta(seconds=1),)]
+            with self.subTest(service=module.__name__), \
+                    patch.object(module, "connect", return_value=connection), \
+                    patch.dict("os.environ", {"APP_VERSION": "a" * 40}):
+                response = module.app.test_client().get("/health")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json, {"status": "ok", "db": "ok", "version": "a" * 40})
+                self.assertIn("UPDATE", cursor.execute.call_args.args[0])
+                connection.rollback.assert_called_once()
+                connection.close.assert_called_once()
+
+    def test_malformed_roster_is_treated_as_unavailable(self):
+        reply = MagicMock()
+        reply.read.return_value = b'{"roommates": [{"id": 1, "name": "Alex"}]}'
+        with patch.dict("os.environ", {"CHORES_SERVICE_URL": "http://example.invalid"}), \
+                patch.object(supplies_api, "urlopen") as fetch:
+            fetch.return_value.__enter__.return_value = reply
+            self.assertEqual(supplies_api.get_roommates(), [])

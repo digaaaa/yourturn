@@ -10,7 +10,7 @@ from .database import connect
 
 
 def connect_at_startup():
-    for delay in (1, 2, 4, 5, 5, 5, 5, 5):
+    for delay in (1, 2, 4, 8, 10, 10, 10, 10, 10, 10):
         try:
             return connect()
         except OperationalError:
