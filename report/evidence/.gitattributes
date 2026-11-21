@@ -1,0 +1,2 @@
+# Preserve the captured evidence bytes so file fingerprints remain verifiable.
+*.json -text
