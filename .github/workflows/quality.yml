@@ -1,0 +1,54 @@
+name: Quality
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python tests and coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install and lint
+        run: |
+          python -m pip install -r requirements.txt -r requirements-ci.txt
+          python -m ruff check --no-cache services scripts
+      - name: Test Assignment 1
+        run: python -m pytest
+      - name: Test split services and enforce coverage per domain
+        run: |
+          python -m pip install -r services/chores/requirements.txt -r services/supplies/requirements.txt
+          python -m coverage run --source=services.chores,services.supplies -m unittest discover -s services/tests -v
+          python -m coverage report --include='*/chores/rules.py,*/chores/service.py' --fail-under=70
+          python -m coverage report --include='*/supplies/rules.py,*/supplies/service.py' --fail-under=70
+
+  compose:
+    name: Docker builds and SQL Server integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate disposable test credentials
+        shell: bash
+        run: |
+          for name in MSSQL_SA_PASSWORD CHORES_DB_PASSWORD SUPPLIES_DB_PASSWORD; do
+            value="Aa1_$(openssl rand -hex 24)"
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+          done
+      - name: Build and start the stack
+        run: docker compose up -d --build
+      - name: Exercise both APIs against SQL Server
+        run: python scripts/check_local.py
+      - name: Stop the integration stack
+        if: always()
+        run: docker compose down
