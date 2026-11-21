@@ -34,7 +34,9 @@ def main():
                 cursor.execute(f"IF USER_ID(N'{login}') IS NULL CREATE USER [{login}] WITH PASSWORD = %s",
                                (password,))
                 cursor.execute(f"GRANT CREATE TABLE TO [{login}]")
-                cursor.execute(f"GRANT ALTER, SELECT, INSERT, UPDATE, DELETE ON SCHEMA::dbo TO [{login}]")
+                cursor.execute(
+                    f"GRANT ALTER, REFERENCES, SELECT, INSERT, UPDATE, DELETE ON SCHEMA::dbo TO [{login}]"
+                )
         except pymssql.Error as error:
             code = error.args[0] if error.args and isinstance(error.args[0], int) else "unknown"
             raise SystemExit(f"Azure SQL setup failed for {database}; database error code {code}.") from None
