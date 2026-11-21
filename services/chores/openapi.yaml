@@ -1,0 +1,229 @@
+openapi: "3.0.3"
+info:
+  title: "YourTurn Chores API"
+  version: "1.0.0"
+servers: [{"url":"http://localhost:8001","description":"Local Compose"}]
+paths:
+  /:
+    get:
+      summary: "Identify the service"
+      responses:
+        "200":
+          description: "Service information"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                required: ["service","message"]
+                properties:
+                  service:
+                    type: "string"
+                    enum: ["chores"]
+                  message:
+                    type: "string"
+    options:
+      summary: "Return applicable methods and CORS headers"
+      responses:
+        "200":
+          description: "Preflight response"
+  /health:
+    get:
+      summary: "Check read and write permissions on this service database"
+      responses:
+        "200":
+          description: "Database ready"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: "Database unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+    options:
+      summary: "Return applicable methods and CORS headers"
+      responses:
+        "200":
+          description: "Preflight response"
+  /chores/:
+    get:
+      summary: "List chores, current turns and monthly completions"
+      responses:
+        "200":
+          description: "Domain overview"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Overview"
+        "500":
+          description: "Unexpected database or service error"
+    options:
+      summary: "Return applicable methods and CORS headers"
+      responses:
+        "200":
+          description: "Preflight response"
+  /chores/{chore_id}/done:
+    parameters: [{"in":"path","name":"chore_id","required":true,"schema":{"type":"integer","minimum":0}}]
+    post:
+      summary: "Record a chore completion"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              required: ["roommate_id"]
+              properties:
+                roommate_id:
+                  oneOf: [{"type":"integer"},{"type":"string","pattern":"^[0-9]{1,10}$"}]
+          application/x-www-form-urlencoded:
+            schema:
+              type: "object"
+              required: ["roommate_id"]
+              properties:
+                roommate_id:
+                  oneOf: [{"type":"integer"},{"type":"string","pattern":"^[0-9]{1,10}$"}]
+      responses:
+        "204":
+          description: "Saved"
+        "400":
+          description: "Invalid input or unknown ID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Unexpected database or service error"
+    options:
+      summary: "Return applicable methods and CORS headers"
+      responses:
+        "200":
+          description: "Preflight response"
+  /roommates:
+    get:
+      summary: "Return the canonical roommate roster to Supplies"
+      responses:
+        "200":
+          description: "Roster in rotation order"
+          content:
+            application/json:
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/components/schemas/Roommate"
+        "500":
+          description: "Database error"
+    options:
+      summary: "Return applicable methods and CORS headers"
+      responses:
+        "200":
+          description: "Preflight response"
+  /chores/household-summary:
+    get:
+      summary: "Join the roster with current-month spending fetched from Supplies"
+      responses:
+        "200":
+          description: "Spending by roommate"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                required: ["spending"]
+                properties:
+                  spending:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/Spending"
+        "500":
+          description: "Unexpected database or service error"
+        "503":
+          description: "Supplies unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    options:
+      summary: "Return applicable methods and CORS headers"
+      responses:
+        "200":
+          description: "Preflight response"
+components:
+  schemas:
+    Health:
+      type: "object"
+      required: ["status","db","version"]
+      properties:
+        status:
+          type: "string"
+          enum: ["ok","unavailable"]
+        db:
+          type: "string"
+          enum: ["ok","unavailable"]
+        version:
+          type: "string"
+    Error:
+      type: "object"
+      required: ["error"]
+      properties:
+        error:
+          type: "string"
+    Roommate:
+      type: "object"
+      required: ["id","name"]
+      properties:
+        id:
+          type: "integer"
+        name:
+          type: "string"
+    Spending:
+      type: "object"
+      required: ["name","spent"]
+      properties:
+        name:
+          type: "string"
+        spent:
+          type: "number"
+    Chore:
+      type: "object"
+      required: ["id","name","frequency_days","next_person_id","next_person","last_done","days_overdue"]
+      properties:
+        id:
+          type: "integer"
+        name:
+          type: "string"
+        frequency_days:
+          type: "integer"
+        next_person_id:
+          type: "integer"
+        next_person:
+          type: "string"
+        last_done:
+          type: "string"
+          format: "date"
+          nullable: true
+        days_overdue:
+          type: "integer"
+    Overview:
+      type: "object"
+      required: ["chores","roommates","stats"]
+      properties:
+        chores:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Chore"
+        roommates:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Roommate"
+        stats:
+          type: "array"
+          items:
+            type: "object"
+            required: ["name","done"]
+            properties:
+              name:
+                type: "string"
+              done:
+                type: "integer"

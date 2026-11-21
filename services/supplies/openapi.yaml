@@ -1,0 +1,216 @@
+openapi: "3.0.3"
+info:
+  title: "YourTurn Supplies API"
+  version: "1.0.0"
+servers: [{"url":"http://localhost:8002","description":"Local Compose"}]
+paths:
+  /:
+    get:
+      summary: "Identify the service"
+      responses:
+        "200":
+          description: "Service information"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                required: ["service","message"]
+                properties:
+                  service:
+                    type: "string"
+                    enum: ["supplies"]
+                  message:
+                    type: "string"
+    options:
+      summary: "Return applicable methods and CORS headers"
+      responses:
+        "200":
+          description: "Preflight response"
+  /health:
+    get:
+      summary: "Check read and write permissions on this service database"
+      responses:
+        "200":
+          description: "Database ready"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: "Database unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+    options:
+      summary: "Return applicable methods and CORS headers"
+      responses:
+        "200":
+          description: "Preflight response"
+  /supplies/:
+    get:
+      summary: "List supplies and spending. Inventory remains available when the roommate roster is unavailable."
+      responses:
+        "200":
+          description: "Domain overview"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Overview"
+        "500":
+          description: "Unexpected database or service error"
+    options:
+      summary: "Return applicable methods and CORS headers"
+      responses:
+        "200":
+          description: "Preflight response"
+  /supplies/{supply_id}/bought:
+    parameters: [{"in":"path","name":"supply_id","required":true,"schema":{"type":"integer","minimum":0}}]
+    post:
+      summary: "Record a purchase"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              required: ["roommate_id","price"]
+              properties:
+                roommate_id:
+                  oneOf: [{"type":"integer"},{"type":"string","pattern":"^[0-9]{1,10}$"}]
+                price:
+                  oneOf: [{"type":"number"},{"type":"string"}]
+                  description: "Numeric amount above zero and at most 1000 EUR."
+          application/x-www-form-urlencoded:
+            schema:
+              type: "object"
+              required: ["roommate_id","price"]
+              properties:
+                roommate_id:
+                  oneOf: [{"type":"integer"},{"type":"string","pattern":"^[0-9]{1,10}$"}]
+                price:
+                  oneOf: [{"type":"number"},{"type":"string"}]
+                  description: "Numeric amount above zero and at most 1000 EUR."
+      responses:
+        "204":
+          description: "Saved"
+        "400":
+          description: "Invalid input or unknown ID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Unexpected database or service error"
+        "503":
+          description: "Chores roster unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    options:
+      summary: "Return applicable methods and CORS headers"
+      responses:
+        "200":
+          description: "Preflight response"
+  /supplies/spending:
+    get:
+      summary: "Return monthly spending for Chores without fetching the roommate roster"
+      responses:
+        "200":
+          description: "Totals keyed by roommate ID"
+          content:
+            application/json:
+              schema:
+                type: "array"
+                items:
+                  type: "object"
+                  required: ["roommate_id","spent"]
+                  properties:
+                    roommate_id:
+                      type: "integer"
+                    spent:
+                      type: "number"
+        "500":
+          description: "Database error"
+    options:
+      summary: "Return applicable methods and CORS headers"
+      responses:
+        "200":
+          description: "Preflight response"
+components:
+  schemas:
+    Health:
+      type: "object"
+      required: ["status","db","version"]
+      properties:
+        status:
+          type: "string"
+          enum: ["ok","unavailable"]
+        db:
+          type: "string"
+          enum: ["ok","unavailable"]
+        version:
+          type: "string"
+    Error:
+      type: "object"
+      required: ["error"]
+      properties:
+        error:
+          type: "string"
+    Roommate:
+      type: "object"
+      required: ["id","name"]
+      properties:
+        id:
+          type: "integer"
+        name:
+          type: "string"
+    Spending:
+      type: "object"
+      required: ["name","spent"]
+      properties:
+        name:
+          type: "string"
+        spent:
+          type: "number"
+    Supply:
+      type: "object"
+      required: ["id","name","next_person_id","next_person","last_bought","last_price"]
+      properties:
+        id:
+          type: "integer"
+        name:
+          type: "string"
+        next_person_id:
+          type: "integer"
+          nullable: true
+        next_person:
+          type: "string"
+          nullable: true
+        last_bought:
+          type: "string"
+          format: "date"
+          nullable: true
+        last_price:
+          type: "number"
+          nullable: true
+    Overview:
+      type: "object"
+      required: ["supplies","roommates","spending","warning"]
+      properties:
+        supplies:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Supply"
+        roommates:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Roommate"
+        spending:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Spending"
+        warning:
+          type: "string"
+          nullable: true
