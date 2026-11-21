@@ -39,3 +39,43 @@ Context: Flatmates also borrow each other's things ("took your boots" → "put t
 Decision: Do not build Borrowing. YourTurn ships with exactly two domains, Chores and Supplies, each fully tested.
 Alternatives considered: Building Borrowing as a third blueprint with its own `borrowings` table, rejected because with a three-day schedule it would have meant thinner tests and a rushed README and ADR log, which are worth far more of the grade than an extra domain.
 Consequences: The app does less for flatmates today, but because domains share only the `roommates` table, Borrowing can be added later as a new `borrowing/` package and table that points at `roommates`, without changing chores or supplies at all.
+
+## 6. Keep the Chores and Supplies seam and put the roster in Chores
+Date: 2026-11-21
+Status: Decided
+Context: ADR 2 separated the rules and SQL by domain. The roster was the one piece both features needed.
+Decision: Chores owns roommates. Supplies reads the roster through `GET /roommates`. Chores fetches spending grouped by roommate ID for its optional summary. Both calls use environment URLs and a two-second socket timeout.
+Alternatives considered: Copying roommates into both databases would avoid the HTTP call but risk different IDs and stale names. Keeping the roster as a shared table would couple the database permissions and deployment.
+Consequences: Chores still works when Supplies is down. Supplies can still show inventory when Chores is down, with an explanation and a 503 for writes requiring a verified roommate. Services can change their tables without asking the other service to update SQL.
+
+## 7. Apply forward-only SQL migrations within each service
+Date: 2026-11-21
+Status: Decided
+Context: Assignment 1 created tables when it started. The split must preserve existing history and SQL Server must evolve each database independently.
+Decision: Each startup applies numbered files in order and records them in `schema_migrations` in the same transaction. The read-only SQLite importer maps the original records into the new catalogues and refuses conflicting IDs. Supplies stores a plain roommate ID and validates it through Chores before writing.
+Alternatives considered: An ORM and migration framework would offer generated scripts but add a second representation of an already small SQL schema. Recreating the tables would lose history.
+Consequences: Migration 003 can add a timestamp without rewriting existing completion dates. A failed uncommitted migration rolls back. For a released mistake, pause deployments, retain the database and backups, and apply a reviewed corrective migration. If recovery requires a restore, verify a separate point-in-time restore and reconcile newer writes before switching traffic. Never replace the existing database during rollout.
+
+## 8. Prepare Consumption apps and a static site with OIDC deployment
+Date: 2026-11-21
+Status: Decided
+Context: The application has short interactive workloads and long idle periods. The brief permits two app containers, serverless SQL, Storage, and the associated deployment identity and logs.
+Decision: Use two Consumption apps with zero to one replica, one free-offer serverless database per domain, Storage static hosting, and Log Analytics. The bootstrap checks the requested database settings. GitHub Actions uses an identity trusted by main and scoped to the assignment. Storage uploads use an account-scoped data role.
+Alternatives considered: Dedicated capacity and an always-running frontend would add cost and additional runtime management. A long-lived deployment password would require rotation and widen the impact of a leak.
+Consequences: Idle apps can stop and SQL can pause, so the first request may need a retry. Startup backs off while the database resumes. One replica reduces migration contention. At much higher traffic, measure queueing and SQL use before increasing capacity, move migrations behind a single deployment step before allowing concurrent replicas, and revisit the cost controls.
+
+## 9. Gate each service independently and integrate against SQL Server
+Date: 2026-11-21
+Status: Decided
+Context: Turn rules are easy to test alone. SQL dialect, browser origins, peer timeouts, and deployment ordering can still break the full system.
+Decision: Gate lint, both test suites, independent 70% core-logic coverage, API and system specifications, and Docker/SQL integration. Run HTTP across actual Flask applications using stubbed database operations in the fast suite. A separate Compose check exercises both writes against a real SQL Server database.
+Alternatives considered: Mocking all cross-service calls would bypass the actual request and JSON paths. Testing every commit against Azure SQL would wake the live database and mix CI with deployment state.
+Consequences: The smoke test proves the local integration and check ordering. A separate main-only delivery job publishes exact-SHA images and checks the live SHA when Azure delivery is enabled. CI does not measure live cold-start time or test every browser interaction.
+
+## 10. Keep synchronous HTTP without a broker
+Date: 2026-11-21
+Status: Decided
+Context: Each user action needs an immediate confirmation. The two cross-service reads are small, and the assignment allows only the two runtime services.
+Decision: Use direct HTTP and a clear partial response when a peer is down. Leave out a background worker, queue, and shared distributed cache.
+Alternatives considered: Queuing a purchase would let it wait for Chores but would need a durable queue, duplicate protection, and a new UI state. A roster cache could show stale roommate IDs after a change.
+Consequences: Users may need to retry a purchase after a short outage. Consider a durable queue only if repeated outages or higher volume create a genuine need for accepted-but-pending operations with clear ownership and replay rules.
