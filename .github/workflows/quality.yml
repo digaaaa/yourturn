@@ -63,3 +63,14 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install -r requirements-ci.txt
       - run: openapi-spec-validator services/chores/openapi.yaml services/supplies/openapi.yaml
+
+  delivery:
+    name: Delivery
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [python, compose, openapi]
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/delivery.yml
+    secrets: inherit
