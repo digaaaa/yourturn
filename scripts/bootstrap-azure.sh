@@ -103,8 +103,11 @@ import sys
 
 name, actual = sys.argv[1], json.loads(os.environ["ACTUAL_SQL_JSON"])
 expected = dict(free=True, whenFull="AutoPause", tier="GeneralPurpose", family="Gen5",
-                sku="GP_S_Gen5", max=1, min=0.5, backup="Local", size=32 * 1024**3)
-if any(actual[key] != value for key, value in expected.items()):
+                max=1, min=0.5, backup="Local", size=32 * 1024**3)
+# Azure can return the serverless SKU with its capacity suffix.
+if actual["sku"] not in {"GP_S_Gen5", "GP_S_Gen5_1"} or any(
+    actual[key] != value for key, value in expected.items()
+):
     raise SystemExit(f"{name} differs from the requested free database settings: {actual}")
 print(f"{name} matches the free-offer configuration; provider auto-pause is {actual['pause']} minutes.")
 PY
