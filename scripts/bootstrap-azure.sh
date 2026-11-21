@@ -7,13 +7,17 @@ set -euo pipefail
 : "${AZURE_SUBSCRIPTION_ID:?Select the intended Azure for Students subscription ID}"
 : "${AZURE_PREFIX:?Set the IE username prefix with dots replaced by hyphens}"
 : "${AZURE_REGION:?Set an approved subscription region}"
+: "${AZURE_SQL_REGION:=$AZURE_REGION}"
 : "${GITHUB_REPOSITORY:?Set the exact GitHub owner/repository}"
-: "${PROFESSOR_OBJECT_ID:?Set the confirmed Reader principal object ID}"
+: "${GITHUB_NUMERIC_REPOSITORY:?Set owner@ID/repo@ID for the numeric OIDC subject}"
+: "${ALBERTO_OBJECT_ID:?Set the verified object ID for amartini@faculty.ie.edu}"
+: "${SERRA_OBJECT_ID:?Set the verified object ID for bserra@faculty.ie.edu}"
 : "${SQL_ADMIN_USER:?Set the SQL administrator user}"
 : "${SQL_ADMIN_PASSWORD:?Provide the SQL administrator password securely}"
 
 [[ "$AZURE_PREFIX" =~ ^[a-z][a-z0-9-]*[a-z0-9]$ ]]
-[[ "$PROFESSOR_OBJECT_ID" =~ ^[0-9a-fA-F-]{36}$ ]]
+[[ "$ALBERTO_OBJECT_ID" =~ ^[0-9a-fA-F-]{36}$ && "$SERRA_OBJECT_ID" =~ ^[0-9a-fA-F-]{36}$ ]]
+[[ "$GITHUB_NUMERIC_REPOSITORY" =~ ^[^/@]+@[0-9]+/[^/@]+@[0-9]+$ ]]
 group="rg-$AZURE_PREFIX"
 server="$AZURE_PREFIX-sql"
 environment="$AZURE_PREFIX-env"
@@ -22,12 +26,25 @@ storage="${AZURE_PREFIX//-/}ui"
 [[ ${#storage} -le 24 && ${#AZURE_PREFIX} -le 23 ]]
 
 az account set --subscription "$AZURE_SUBSCRIPTION_ID"
-az account show --query '{subscription:name,tenant:tenantId}' --output table
+selected=$(az account show --query '[id,name,state]' --output json)
+python3 - "$AZURE_SUBSCRIPTION_ID" "$selected" <<'PY'
+import json
+import sys
+
+subscription, name, state = json.loads(sys.argv[2])
+if subscription != sys.argv[1] or name != "Azure for Students" or state != "Enabled":
+    raise SystemExit("Expected the approved, enabled personal Azure for Students subscription.")
+print(f"Verified subscription: {name} ({subscription})")
+PY
+
+for provider in Microsoft.App Microsoft.OperationalInsights Microsoft.Sql Microsoft.Storage Microsoft.ManagedIdentity; do
+    az provider register --namespace "$provider" --wait --output none
+done
 az group create --name "$group" --location "$AZURE_REGION" --output none
 scope=$(az group show --name "$group" --query id --output tsv)
 
 if ! az sql server show --name "$server" --resource-group "$group" --output none 2>/dev/null; then
-    az sql server create --name "$server" --resource-group "$group" --location "$AZURE_REGION" \
+    az sql server create --name "$server" --resource-group "$group" --location "$AZURE_SQL_REGION" \
         --admin-user "$SQL_ADMIN_USER" --admin-password "$SQL_ADMIN_PASSWORD" \
         --minimal-tls-version 1.2 --output none
 fi
@@ -39,7 +56,7 @@ for service in chores supplies; do
     if ! az sql db show --resource-group "$group" --server "$server" --name "$database" --output none 2>/dev/null; then
         az sql db create --resource-group "$group" --server "$server" --name "$database" \
             --edition GeneralPurpose --family Gen5 --compute-model Serverless \
-            --min-capacity 0.5 --capacity 1 --auto-pause-delay 60 --max-size 32GB \
+            --min-capacity 0.5 --capacity 1 \
             --backup-storage-redundancy Local --use-free-limit true \
             --free-limit-exhaustion-behavior AutoPause --output none
     fi
@@ -51,10 +68,10 @@ import sys
 
 name, actual = sys.argv[1], json.loads(sys.argv[2])
 expected = dict(free=True, whenFull="AutoPause", tier="GeneralPurpose", family="Gen5",
-                max=1, min=0.5, pause=60, backup="Local", size=32 * 1024**3)
-if actual != expected:
+                max=1, min=0.5, backup="Local", size=32 * 1024**3)
+if any(actual[key] != value for key, value in expected.items()):
     raise SystemExit(f"{name} differs from the requested free database settings: {actual}")
-print(f"{name} matches the requested free-offer configuration.")
+print(f"{name} matches the free-offer configuration; provider auto-pause is {actual['pause']} minutes.")
 PY
 done
 
@@ -74,12 +91,17 @@ principal=$(az identity show --name "$identity" --resource-group "$group" --quer
 az identity federated-credential create --name github-main --identity-name "$identity" \
     --resource-group "$group" --issuer https://token.actions.githubusercontent.com \
     --subject "repo:$GITHUB_REPOSITORY:ref:refs/heads/main" --audiences api://AzureADTokenExchange --output none
+az identity federated-credential create --name github-main-numeric --identity-name "$identity" \
+    --resource-group "$group" --issuer https://token.actions.githubusercontent.com \
+    --subject "repo:$GITHUB_NUMERIC_REPOSITORY:ref:refs/heads/main" --audiences api://AzureADTokenExchange --output none
 az role assignment create --assignee-object-id "$principal" --assignee-principal-type ServicePrincipal \
     --role Contributor --scope "$scope" --output none
 az role assignment create --assignee-object-id "$principal" --assignee-principal-type ServicePrincipal \
     --role 'Storage Blob Data Contributor' --scope "$storage_scope" --output none
-az role assignment create --assignee-object-id "$PROFESSOR_OBJECT_ID" --assignee-principal-type User \
-    --role Reader --scope "$scope" --output none
+for professor in "$ALBERTO_OBJECT_ID" "$SERRA_OBJECT_ID"; do
+    az role assignment create --assignee-object-id "$professor" --assignee-principal-type User \
+        --role Reader --scope "$scope" --output none
+done
 
 if ! az containerapp env show --name "$environment" --resource-group "$group" --output none 2>/dev/null; then
     az containerapp env create --name "$environment" --resource-group "$group" --location "$AZURE_REGION" \
