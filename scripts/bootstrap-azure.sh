@@ -48,6 +48,24 @@ if ! az sql server show --name "$server" --resource-group "$group" --output none
         --admin-user "$SQL_ADMIN_USER" --admin-password "$SQL_ADMIN_PASSWORD" \
         --minimal-tls-version 1.2 --output none
 fi
+[[ $(az sql server show --name "$server" --resource-group "$group" --query location --output tsv) == "$AZURE_SQL_REGION" ]]
+
+database_names=()
+for service in chores supplies; do
+    database="$AZURE_PREFIX-$service-db"
+    if ! az sql db show --resource-group "$group" --server "$server" --name "$database" --output none 2>/dev/null; then
+        database_names+=("$database")
+    fi
+done
+if (( ${#database_names[@]} )); then
+    root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+    names_json=$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1:]))' "${database_names[@]}")
+    az deployment group validate --resource-group "$group" --validation-level Provider \
+        --template-file "$root/deployment/sql-free-preflight.json" \
+        --parameters "server=$server" "location=$AZURE_SQL_REGION" "databaseNames=$names_json" \
+        --output none
+    printf '%s\n' 'Azure provider validation accepted the requested free-offer database configuration.'
+fi
 az sql server firewall-rule create --resource-group "$group" --server "$server" \
     --name AllowAzureServices --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0 --output none
 
@@ -61,14 +79,14 @@ for service in chores supplies; do
             --free-limit-exhaustion-behavior AutoPause --output none
     fi
     actual=$(az sql db show --resource-group "$group" --server "$server" --name "$database" \
-        --query '{free:useFreeLimit,whenFull:freeLimitExhaustionBehavior,tier:sku.tier,family:sku.family,max:sku.capacity,min:minCapacity,pause:autoPauseDelay,backup:requestedBackupStorageRedundancy,size:maxSizeBytes}' --output json)
+        --query '{free:useFreeLimit,whenFull:freeLimitExhaustionBehavior,tier:sku.tier,sku:sku.name,family:sku.family,max:sku.capacity,min:minCapacity,pause:autoPauseDelay,backup:requestedBackupStorageRedundancy,size:maxSizeBytes}' --output json)
     python3 - "$database" "$actual" <<'PY'
 import json
 import sys
 
 name, actual = sys.argv[1], json.loads(sys.argv[2])
 expected = dict(free=True, whenFull="AutoPause", tier="GeneralPurpose", family="Gen5",
-                max=1, min=0.5, backup="Local", size=32 * 1024**3)
+                sku="GP_S_Gen5", max=1, min=0.5, backup="Local", size=32 * 1024**3)
 if any(actual[key] != value for key, value in expected.items()):
     raise SystemExit(f"{name} differs from the requested free database settings: {actual}")
 print(f"{name} matches the free-offer configuration; provider auto-pause is {actual['pause']} minutes.")
