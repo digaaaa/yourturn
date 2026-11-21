@@ -1,0 +1,106 @@
+{
+    "status":  "verified",
+    "deployment_sha":  "ac335ccf3641b78405659a5986b6c8bbbae579cb",
+    "workflow_url":  "https://github.com/digaaaa/yourturn/actions/runs/44927793847/attempts/2",
+    "subscription_name":  "Azure for Students",
+    "resource_group":  "rg-knehad-ieu2024",
+    "region":  "polandcentral",
+    "database":  "knehad-ieu2024-chores-db",
+    "source_api":  "https://knehad-ieu2024-chores.victoriousplant-cf8fe7c4.spaincentral.azurecontainerapps.io",
+    "fingerprint_method":  "SHA-256 of UTF-8 JSON with sorted keys, compact separators, and rows ordered by id. Fields: id, chore_id, roommate_id, done_on.",
+    "before_demo":  {
+                        "original_fields_sha256":  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+                        "row_count":  0,
+                        "row_fingerprints":  [
+
+                                             ]
+                    },
+    "demo_completion":  {
+                            "description":  "Assignment 2 migration evidence demo",
+                            "request_utc":  "2026-11-21T18:18:38.3537287Z",
+                            "http_status":  204,
+                            "chore":  "Dishes",
+                            "roommate":  "Alex",
+                            "row":  {
+                                        "id":  1,
+                                        "chore_id":  1,
+                                        "roommate_id":  1,
+                                        "done_on":  "2026-11-21"
+                                    }
+                        },
+    "before_migration":  {
+                             "table":  "dbo.chore_log",
+                             "columns":  [
+                                             {
+                                                 "name":  "id",
+                                                 "type":  "int",
+                                                 "nullable":  "NO",
+                                                 "default_value":  null,
+                                                 "is_identity":  1
+                                             },
+                                             {
+                                                 "name":  "chore_id",
+                                                 "type":  "int",
+                                                 "nullable":  "NO",
+                                                 "default_value":  null,
+                                                 "is_identity":  0
+                                             },
+                                             {
+                                                 "name":  "roommate_id",
+                                                 "type":  "int",
+                                                 "nullable":  "NO",
+                                                 "default_value":  null,
+                                                 "is_identity":  0
+                                             },
+                                             {
+                                                 "name":  "done_on",
+                                                 "type":  "date",
+                                                 "nullable":  "NO",
+                                                 "default_value":  null,
+                                                 "is_identity":  0
+                                             }
+                                         ],
+                             "keys":  [
+                                          {
+                                              "type":  "FOREIGN KEY",
+                                              "column_name":  "chore_id",
+                                              "target_schema":  "dbo",
+                                              "target_table":  "chores",
+                                              "target_column":  "id"
+                                          },
+                                          {
+                                              "type":  "PRIMARY KEY",
+                                              "column_name":  "id",
+                                              "target_schema":  null,
+                                              "target_table":  null,
+                                              "target_column":  null
+                                          },
+                                          {
+                                              "type":  "FOREIGN KEY",
+                                              "column_name":  "roommate_id",
+                                              "target_schema":  "dbo",
+                                              "target_table":  "roommates",
+                                              "target_column":  "id"
+                                          }
+                                      ],
+                             "schema_migrations":  [
+                                                       {
+                                                           "filename":  "001_init.sql",
+                                                           "applied_at_utc":  "2026-11-21T17:17:29.6633776"
+                                                       },
+                                                       {
+                                                           "filename":  "002_seed.sql",
+                                                           "applied_at_utc":  "2026-11-21T17:17:29.9505214"
+                                                       }
+                                                   ],
+                             "row_count":  1,
+                             "original_fields_sha256":  "b346481ae2c40667504ecc81002bfaa38e333e39fa9f65e01ad262f6e0263de0",
+                             "row_fingerprints":  [
+                                                      {
+                                                          "id":  1,
+                                                          "sha256":  "63c8613d9f7a2f467d48ce3015a68589fd7879d8bb350274b26c08c80afe98cb"
+                                                      }
+                                                  ]
+                         },
+    "captured_at_utc":  "2026-11-21T18:18:41.1357364Z"
+}

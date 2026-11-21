@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>YourTurn | Individual Assignment 2</title>
+<style>
+  @page { size: A4; margin: 19mm 20mm; }
+  * { box-sizing: border-box; }
+  body { color: #162c2a; font: 11pt/1.5 "Segoe UI", Arial, sans-serif; margin: 0; }
+  section { break-after: page; min-height: 247mm; position: relative; padding-bottom: 12mm; }
+  section:last-child { break-after: auto; }
+  header { border-top: 4px solid #146657; padding-top: 5mm; margin-bottom: 7mm; }
+  h1 { font-size: 31pt; line-height: 1.06; letter-spacing: -0.6pt; margin: 3mm 0; }
+  h2 { font-size: 20pt; line-height: 1.15; margin: 3mm 0; }
+  h3 { font-size: 12.7pt; margin: 6mm 0 2mm; }
+  p { margin: 0 0 3.5mm; }
+  .label, footer { font-size: 9pt; color: #42645b; }
+  footer { position: absolute; bottom: 0; width: 100%; border-top: 1px solid #b5c8c1; padding-top: 2mm; }
+  pre { white-space: pre-wrap; font: 9.2pt/1.43 Consolas, monospace; padding: 3mm 4mm; background: #edf5f1; border-left: 3px solid #146657; }
+  code { font: 9.5pt Consolas, monospace; overflow-wrap: anywhere; }
+  table { border-collapse: collapse; width: 100%; margin: 2mm 0 5mm; }
+  th, td { text-align: left; vertical-align: top; padding: 2mm 2.3mm; border-bottom: 1px solid #c8d8d1; }
+  th { background: #edf5f1; }
+  a { color: #126157; }
+  .note { background: #f8f0e2; border-left: 3px solid #ab6a16; padding: 3mm 4mm; }
+  ul { padding-left: 6mm; }
+  li { margin-bottom: 2mm; }
+</style>
+</head>
+<body>
+<section>
+  <header>
+    <div class="label">SOFTWARE DEVELOPMENT &amp; DEVOPS · INDIVIDUAL ASSIGNMENT 2</div>
+    <h1>YourTurn</h1>
+    <p>Service split and delivery evidence · 21 November 2026 · knehad.ieu2024</p>
+  </header>
+  <p>YourTurn helps roommates decide whose turn it is to complete chores and buy shared supplies. Assignment 2 preserves the original turn rules, reminders, and monthly totals while changing how the system is deployed and how its data is owned.</p>
+  <h3>Assignment 1 · one process and one database</h3>
+  <pre>Browser → Flask + Jinja
+            ├─ Chores blueprint ─┐
+            └─ Supplies blueprint ┤
+                                 └─ SQLite
+                      Shared seam: roommates table</pre>
+  <h3>Assignment 2 · two independently runnable APIs</h3>
+  <pre>Browser ← static HTML, CSS, JS ← nginx locally / Storage on Azure
+   ├─ JSON → Chores API   → Chores SQL database
+   └─ JSON → Supplies API → Supplies SQL database
+
+Supplies → GET /roommates → Chores
+Chores   → GET /supplies/spending → Supplies</pre>
+  <p>The seam from ADR 2 held. Chores owns the roster. Supplies receives roommate IDs and names over HTTP and stores only their IDs in purchase records. The reciprocal spending request returns totals by ID. This avoids shared credentials, cross-database joins, and duplicate roommate tables.</p>
+  <p>The static UI calls both APIs directly, uses their configured origins, and replaces the original server-rendered forms with JSON requests. The original Flask monolith and SQLite files remain available for comparison and regression tests.</p>
+  <footer>YourTurn · Architecture · 1 / 5</footer>
+</section>
+<section>
+  <header><div class="label">YOURTURN · DATA</div><h2>Ownership and schema evolution</h2></header>
+  <pre>Chores database                 Supplies database
+  roommates ──┐                   supplies ──┐
+              ├─ chore_log                   └─ purchases
+  chores ─────┘                                 roommate_id: Chores API ID
+  schema_migrations               schema_migrations</pre>
+  <p>The database still enforces the internal foreign keys. Supplies validates the roommate against the current Chores roster before recording a purchase. Each local login was denied access to the other database.</p>
+  <h3>Startup and legacy transfer</h3>
+  <p>The one-off Compose initializer sets up two databases and logins. A service then applies numbered SQL files in order and commits each successful file with its filename. Historical SQLite records are read without changing the file. The importer matches catalogue rows, preserves log IDs, and aborts on conflicting IDs. Repeating the local import added zero records.</p>
+  <h3>Migration 003 · verified on Azure SQL</h3>
+  <table>
+    <thead><tr><th>Evidence</th><th>Before</th><th>After and restart</th></tr></thead>
+    <tbody>
+      <tr><td>Chore rows</td><td>1</td><td>1 before the follow-up write</td></tr>
+      <tr><td>First row ID</td><td>1</td><td>1</td></tr>
+      <tr><td>Timestamp column</td><td>Absent</td><td><code>recorded_at_utc datetime2</code></td></tr>
+      <tr><td>Migration history</td><td>001, 002</td><td>001, 002, 003 (once)</td></tr>
+    </tbody>
+  </table>
+  <p>The fingerprint of the original fields matched before and after: <code>b346481ae2c40667504ecc81002bfaa38e333e39fa9f65e01ad262f6e0263de0</code>. Row 1 retained its original date and a null insertion timestamp. The follow-up completion created row 2 with UTC timestamp <code>2026-11-21T18:29:20Z</code>. Azure logged the migration once at <code>18:27:49.796Z</code>.</p>
+  <p>See the <a href="https://github.com/digaaaa/yourturn/actions/runs/44935452608">successful migration deployment</a> and the <a href="evidence/azure-baseline.json">baseline</a> and <a href="evidence/azure-after-migration.json">after-migration</a> SQL evidence.</p>
+  <footer>YourTurn · Databases and migrations · 2 / 5</footer>
+</section>
+<section>
+  <header><div class="label">YOURTURN · DELIVERY</div><h2>Build, publish, and deploy</h2></header>
+  <pre>GitHub push or PR → lint, test, coverage, API validation, Docker/SQL
+Successful main run → GHCR chores:SHA and supplies:SHA
+                         │
+       approved Azure gate + GitHub OIDC
+                         ├─ Container Apps → Azure SQL
+                         └─ Storage $web → browser</pre>
+  <h3>Local Docker</h3>
+  <p><code>docker compose up --build</code> starts SQL Server, the one-off database initializer, both apps, and stock nginx. The services run as non-root users. The database volume retains data across container restarts. The UI is at <code>http://localhost:8080</code>.</p>
+  <h3>Verified GitHub delivery</h3>
+  <p>The <a href="https://github.com/digaaaa/yourturn/actions/runs/44927793847/attempts/2">baseline deployment</a> published both exact-SHA images and deployed both APIs and the <a href="https://knehadieu2024ui.z43.web.core.windows.net/">Azure Storage website</a>. Both health responses included baseline SHA <code>ac335ccf3641b78405659a5986b6c8bbbae579cb</code> and database status <code>ok</code>.</p>
+  <h3>Verified Azure layout</h3>
+  <table>
+    <tbody>
+      <tr><th>Resource group</th><td><code>rg-knehad-ieu2024</code></td></tr>
+      <tr><th>Apps and environment</th><td><code>knehad-ieu2024-chores</code>, <code>knehad-ieu2024-supplies</code>, <code>knehad-ieu2024-env</code></td></tr>
+      <tr><th>SQL server and databases</th><td><code>knehad-ieu2024-sql</code>, with <code>-chores-db</code> and <code>-supplies-db</code> under the student prefix</td></tr>
+      <tr><th>UI and deployment identity</th><td><code>knehadieu2024ui</code> and <code>knehad-ieu2024-github</code></td></tr>
+    </tbody>
+  </table>
+  <p>Spain Central hosts the Consumption apps (0–1 replicas), Storage, and Log Analytics. Poland Central hosts two Gen5 serverless SQL databases (0.5–1 vCore), both verified on the free offer with <code>AutoPause</code> at the monthly limit. OIDC signed in from <code>main</code>, and both professors have resource-group Reader access.</p>
+  <footer>YourTurn · CI/CD and Azure design · 3 / 5</footer>
+</section>
+<section>
+  <header><div class="label">YOURTURN · VERIFICATION</div><h2>Tests and partial failure</h2></header>
+  <table>
+    <thead><tr><th>Check</th><th>Observed result</th></tr></thead>
+    <tbody>
+      <tr><td>Assignment 1 tests</td><td>71 passed</td></tr>
+      <tr><td>Split-service tests</td><td>14 passed after health and payload robustness changes</td></tr>
+      <tr><td>Core coverage</td><td>Chores 76%, Supplies 77%, above the 70% threshold separately</td></tr>
+      <tr><td>Real SQL integration</td><td>Both APIs wrote and read records; both HTTP calls returned data</td></tr>
+      <tr><td>OpenAPI</td><td>Both specifications passed validation</td></tr>
+      <tr><td>Browser and CORS</td><td>Edge rendered both local views. Approved origin received the CORS header; a different origin did not.</td></tr>
+    </tbody>
+  </table>
+  <p>Unit tests cover turn selection, overdue logic, totals, validation, and API success and failure responses. The seam tests run a real HTTP request against the other Flask app with controlled database responses. Compose integration adds actual SQL Server to catch driver and query issues.</p>
+  <h3>Observed outage and recovery</h3>
+  <pre>Chores stopped:
+  Supplies inventory returned 4 items and a roommate warning.
+  POST /supplies/1/bought 503 3882.4ms
+Supplies stopped:
+  Chores overview worked.
+  GET /chores/household-summary 503 3990.4ms
+After restarting each peer, both cross-service requests recovered.</pre>
+  <p>The outbound HTTP library uses a two-second socket timeout. The elapsed request log includes name lookup and other work. Each service logs method, path, status, and duration to stdout.</p>
+  <p><code>/health</code> checks the service's own database by reading a row and verifying a write inside a transaction that is rolled back. It returns 503 on database failure and embeds the build SHA in CI and deployed images. Startup retries give SQL time to resume after a cold start.</p>
+  <footer>YourTurn · Quality and failure evidence · 4 / 5</footer>
+</section>
+<section>
+  <header><div class="label">YOURTURN · PROCESS</div><h2>Decisions, evidence, and release status</h2></header>
+  <h3>Why these choices fit the project</h3>
+  <ul>
+    <li><strong>HTTP rather than a shared database.</strong> Ownership is visible and testable. The peer can fail independently, so optional views degrade and writes that require the roster return a clear error.</li>
+    <li><strong>Numbered SQL rather than an ORM migration tool.</strong> Both services already use SQL directly. On a bad migration, preserve the existing database, use a corrective migration, and restore to a separately reviewed database only if recovery demands it.</li>
+    <li><strong>Consumption and a static website.</strong> There are two app processes. Static files need no application process, and idle apps can scale to zero. Startup latency is the trade-off.</li>
+    <li><strong>One pipeline with an explicit gate.</strong> The code that passes CI is the code tagged in GHCR. Deployment uses the same SHA and waits for that exact version to respond.</li>
+  </ul>
+  <h3>Git and real evidence</h3>
+  <p>The local-stack PRs were integrated into <code>main</code> through <a href="https://github.com/digaaaa/yourturn/pull/8">PR 8</a>. The <a href="https://github.com/digaaaa/yourturn/actions/runs/44927793847/attempts/1">first Azure deployment attempt</a> failed when Chores tried to create a foreign key (SQL error 1088). I added <code>REFERENCES</code> to each login in its own database. The <a href="https://github.com/digaaaa/yourturn/actions/runs/44927793847/attempts/2">second attempt</a> deployed the same SHA successfully. The <a href="https://github.com/digaaaa/yourturn/pull/18">bootstrap fix</a> records the permission explicitly.</p>
+  <h3>AI use disclosure</h3>
+  <p>Codex assisted with implementation, CI and deployment scripts, automated tests, local verification, and this report. Results shown here came from test output, GitHub Actions, or direct local observations recorded during the work. <code>AI_USAGE.md</code> records the assistance and explanations for review before submission.</p>
+  <h3>Live release status</h3>
+  <p class="note">Baseline and migration deployment, public endpoint checks, and Reader access are verified. The final submission tag follows the final approved merge and health verification. The Git history spans fewer than six distinct commit dates, and the five new ADRs were committed on one date.</p>
+  <footer>YourTurn · Process and release status · 5 / 5</footer>
+</section>
+</body>
+</html>
